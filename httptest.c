@@ -19,6 +19,7 @@
 #define MAXCONTENTLEN 4194304
 
 int debug = 0, ipv4 = 0, ipv6 = 0, print_content = 0;
+int sockfd = -1;
 int wait_time = 5;
 char check_string[MAXLEN];
 
@@ -64,7 +65,6 @@ SSL_CTX *InitCTX(void)
 
 int http_test(char *url)
 {
-	int sockfd = -1;
 	int i, n;
 	int https = 0;
 	char hostname[MAXLEN];
@@ -226,7 +226,9 @@ int http_test(char *url)
 		}
 	}
 
-	snprintf(buf, MAXLEN, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: httptest by james@ustc.edu.cn\r\nConnection: close\r\n\r\n", uri, hostname);
+	snprintf(buf, MAXLEN,
+		 "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36\r\nConnection: close\r\n\r\n",
+		 uri, hostname);
 	if (https)
 		n = SSL_write(ssl, buf, strlen(buf));
 	else

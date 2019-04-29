@@ -1,7 +1,7 @@
 all: httptest
 
 httptest: httptest.c
-	gcc -o httptest -Wall httptest.c
+	gcc -o httptest -Wall httptest.c -lssl -lcrypto
 
 indent: httptest.c
 	indent httptest.c  -nbad -bap -nbc -bbo -hnl -br -brs -c33 -cd33 -ncdb -ce -ci4  \

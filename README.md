@@ -2,9 +2,22 @@
 
 httptest [ -d ] [ -p ] [ -4 ] [ -6 ] [ -w wait_time ] [ -r check_string ] URL
 
-如果获取到200应答，并且返回的内容中有check_string，退出值为0
+程序退出值：
+```
+0 如果获取到200应答，并且返回的内容中有check_string
+1 DNS查询错误
+2 TCP连接建立错误
+3 读应答错误
+4 非200应答
+5 提供了check_string, 但是应答中无check_string
+9 https协商错误
+10 url错误
+```
 
-显示 DNS解析时间 TCP连接时间 第一次应答时间 传输时间 传输速度
+stdout输出
+```
+DNS解析时间 TCP连接时间 第一次应答时间 传输时间 传输速度
+```
 
 前4个参数单位是秒，最后1个参数单位是 字节/秒
 

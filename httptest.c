@@ -53,7 +53,7 @@ SSL_CTX *InitCTX(void)
 	ctx = SSL_CTX_new(method);	/* Create new context */
 	if (ctx == NULL) {
 		ERR_print_errors_fp(stdout);
-		abort();
+		exit(9);
 	}
 	return ctx;
 }
@@ -61,24 +61,29 @@ SSL_CTX *InitCTX(void)
 int http_test(char *url)
 {
 	int sockfd = -1;
-	int i = 0, n;
+	int i, n;
 	int https = 0;
 	char hostname[MAXLEN];
+	char port[MAXLEN];
 	char *uri = NULL, *p;
 	struct addrinfo hints, *res;
 	char buf[MAXCONTENTLEN];
 	SSL_CTX *ctx;
 	SSL *ssl;
 
+	if (strlen(url) > MAXLEN)
+		exit(10);
+
 	if (memcmp(url, "https://", 8) == 0) {
 		p = url + 8;
 		https = 1;
 	} else if (memcmp(url, "http://", 7) != 0) {
-		printf("only support http://\n");
-		exit(-1);
+		printf("only support http:// and https:// \n");
+		exit(10);
 	} else
 		p = url + 7;
 	hostname[0] = 0;
+	i = 0;
 	if (*p == '[') {	// ipv6 addr
 		p++;
 		while (*p && (*p != ']') && i < MAXLEN - 1) {
@@ -86,25 +91,47 @@ int http_test(char *url)
 			i++;
 			p++;
 		}
-		if (*p != ']') {	// ipv6 add error 
+		if (*p != ']') {	// ipv6 addr error 
 			printf("url %s error\n", url);
-			exit(-1);
+			exit(10);
 		}
 		p++;
-		uri = p;
 	} else {
-		while (*p && (*p != '/') && i < MAXLEN - 1) {
+		while (*p && (*p != '/') && (*p != ':') && i < MAXLEN - 1) {
 			hostname[i] = *p;
 			i++;
 			p++;
 		}
-		uri = p;
 	}
+	hostname[i] = 0;
+
+	if (hostname[0] == 0)
+		exit(10);
+
+	port[0] = 0;
+	i = 0;
+	if (*p == ':') {
+		p++;
+		while (*p && (*p != '/') && i < MAXLEN - 1) {
+			port[i] = *p;
+			i++;
+			p++;
+		}
+		port[i] = 0;
+	}
+	if (port[0] == 0) {
+		if (https)
+			strcpy(port, "443");
+		else
+			strcpy(port, "80");
+	}
+	uri = p;
 
 	if (uri[0] == 0)
 		uri = "/";
+
 	if (debug) {
-		printf("url: %s\nhostname: %s uri: %s\n", url, hostname, uri);
+		printf("url: %s\nhostname: %s port: %s uri: %s\n", url, hostname, port, uri);
 		printf("begin dns lookup\n");
 	}
 	if (https) {
@@ -114,14 +141,9 @@ int http_test(char *url)
 	}
 
 	start_time();
-	char *port;
-	if (https)
-		port = "443";
-	else
-		port = "80";
 	if ((n = getaddrinfo(hostname, port, &hints, &res)) != 0) {
 		printf("getaddrinfo error for %s\n", hostname);
-		exit(-1);
+		exit(1);
 	}
 	dns_time = delta_time();
 	if (debug) {
@@ -155,7 +177,7 @@ int http_test(char *url)
 
 		if ((sockfd = socket(res->ai_family, SOCK_STREAM, 0)) < 0) {
 			printf("create socket failed: %s\n", strerror(errno));
-			exit(-1);
+			exit(2);
 		}
 
 		struct timeval timeout;
@@ -175,6 +197,12 @@ int http_test(char *url)
 		}
 	}
 	while ((res = res->ai_next) != NULL);
+
+	if (sockfd < 0) {
+		if (debug)
+			printf("tcp connect error\n");
+		exit(2);
+	}
 	connect_time = delta_time();
 	if (debug) {
 		printf("end tcp connect\n");
@@ -190,14 +218,11 @@ int http_test(char *url)
 		if (SSL_connect(ssl) == -1) {
 			if (debug)
 				ERR_print_errors_fp(stdout);
-			exit(-1);
+			exit(9);
 		}
 	}
 
 	snprintf(buf, MAXLEN, "GET %s HTTP/1.0\r\n" "Host: %s\r\n" "User-Agent: curl/7.29.0\r\n" "Connection: close\r\n\r\n", uri, hostname);
-/*	if (debug)
-		printf("send request: %s len=%d", buf, (int)strlen(buf));
-*/
 	if (https)
 		n = SSL_write(ssl, buf, strlen(buf));
 	else
@@ -212,14 +237,14 @@ int http_test(char *url)
 	if (n <= 0) {
 		if (debug)
 			printf("get response: %d\n", n);
-		exit(-1);
+		exit(3);
 	}
 /* HTTP/1.1 200 */
 	if (memcmp(buf + 9, "200", 3) != 0) {
 		buf[12] = 0;
 		if (debug)
 			printf("get response: %s\n", buf);
-		exit(-1);
+		exit(4);
 	}
 	content_len = n;
 	while (n < MAXCONTENTLEN) {
@@ -247,7 +272,7 @@ int http_test(char *url)
 		if (p == NULL) {
 			if (debug)
 				printf("check string not found, return -1\n");
-			exit(-1);
+			exit(5);
 		}
 	}
 	if (debug)
@@ -265,10 +290,18 @@ void usage(void)
 	printf("    -p               print response content\n");
 	printf("    -w wait_time     max conntion time\n");
 	printf("    -r check_string  check_string\n\n");
-	printf("return 0 if get 200 response and match the check_string in response\n\n");
+	printf("exit whith:\n");
+	printf("  0  get 200 response and match the check_string in response\n");
+	printf("  1  dns error\n");
+	printf("  2  tcp connect error\n");
+	printf("  3  read tcp error\n");
+	printf("  4  not 200 response\n");
+	printf("  5  check_string not found\n");
+	printf("  9  https connect error\n");
+	printf(" 10  url error\n");
 	printf("print dns_time tcp_connect_time response_time transfer_time transfer_rate\n");
 	printf("             s                s             s             s        byte/s\n");
-	exit(-1);
+	exit(11);
 }
 
 // httptest  [ -d ] [ -4 ] [ -6 ] [ -w wait_time ] [ -r check_string ] url 
@@ -308,5 +341,5 @@ int main(int argc, char *argv[])
 		http_test(argv[optind]);
 	else
 		usage();
-	exit(-1);
+	exit(11);
 }

@@ -16,16 +16,29 @@
 #include <openssl/err.h>
 
 #define MAXLEN 16384
+// 最多下载4MB
 #define MAXCONTENTLEN 4194304
 
 int debug = 0, ipv4 = 0, ipv6 = 0, print_content = 0;
 int sockfd = -1;
 int wait_time = 5;
 char check_string[MAXLEN];
+char url[MAXLEN];
 
 struct timeval lasttv;
 float dns_time, connect_time, first_time, end_time;
 unsigned long int content_len;
+
+void my_exit(int code)
+{
+	if (code == 0) {
+		printf("%d %.4f %.4f %.4f %.4f %ld %.0f %s\n", code, dns_time, connect_time, first_time, end_time, content_len, (float)content_len / end_time,
+		       url);
+	} else {
+		printf("%d 0 0 0 0 0 %s\n", code, url);
+	}
+	exit(code);
+}
 
 void start_time(void)
 {
@@ -58,12 +71,12 @@ SSL_CTX *InitCTX(void)
 	if (ctx == NULL) {
 		ERR_print_errors_fp(stdout);
 		close(sockfd);
-		exit(9);
+		my_exit(9);
 	}
 	return ctx;
 }
 
-int http_test(char *url)
+void http_test(void)
 {
 	int i, n;
 	int https = 0;
@@ -76,14 +89,14 @@ int http_test(char *url)
 	SSL *ssl;
 
 	if (strlen(url) > MAXLEN)
-		exit(10);
+		my_exit(10);
 
 	if (memcmp(url, "https://", 8) == 0) {
 		p = url + 8;
 		https = 1;
 	} else if (memcmp(url, "http://", 7) != 0) {
 		printf("only support http:// and https:// \n");
-		exit(10);
+		my_exit(10);
 	} else
 		p = url + 7;
 	hostname[0] = 0;
@@ -97,7 +110,7 @@ int http_test(char *url)
 		}
 		if (*p != ']') {	// ipv6 addr error 
 			printf("url %s error\n", url);
-			exit(10);
+			my_exit(10);
 		}
 		p++;
 	} else {
@@ -110,7 +123,7 @@ int http_test(char *url)
 	hostname[i] = 0;
 
 	if (hostname[0] == 0)
-		exit(10);
+		my_exit(10);
 
 	port[0] = 0;
 	i = 0;
@@ -147,7 +160,7 @@ int http_test(char *url)
 	start_time();
 	if ((n = getaddrinfo(hostname, port, &hints, &res)) != 0) {
 		printf("getaddrinfo error for %s\n", hostname);
-		exit(1);
+		my_exit(1);
 	}
 	dns_time = delta_time();
 	if (debug) {
@@ -181,7 +194,7 @@ int http_test(char *url)
 
 		if ((sockfd = socket(res->ai_family, SOCK_STREAM, 0)) < 0) {
 			printf("create socket failed: %s\n", strerror(errno));
-			exit(2);
+			my_exit(2);
 		}
 
 		struct timeval timeout;
@@ -205,7 +218,7 @@ int http_test(char *url)
 	if (sockfd < 0) {
 		if (debug)
 			printf("tcp connect error\n");
-		exit(2);
+		my_exit(2);
 	}
 	connect_time = delta_time();
 	if (debug) {
@@ -222,7 +235,7 @@ int http_test(char *url)
 			if (debug)
 				ERR_print_errors_fp(stdout);
 			close(sockfd);
-			exit(9);
+			my_exit(9);
 		}
 	}
 
@@ -244,7 +257,7 @@ int http_test(char *url)
 		if (debug)
 			printf("get response: %d\n", n);
 		close(sockfd);
-		exit(3);
+		my_exit(3);
 	}
 	buf[n] = 0;
 	/* HTTP/1.1 200 */
@@ -253,7 +266,7 @@ int http_test(char *url)
 		if (debug)
 			printf("get response: %s\n", buf);
 		close(sockfd);
-		exit(4);
+		my_exit(4);
 	}
 	content_len = n;
 	while (n < MAXCONTENTLEN) {
@@ -274,7 +287,6 @@ int http_test(char *url)
 	if (print_content)
 		printf("%s\n", buf);
 
-	printf("%.4f %.4f %.4f %.4f %.0f\n", dns_time, connect_time, first_time, end_time, (float)content_len / end_time);
 	if (check_string[0]) {
 		if (debug)
 			printf("check string: %s\n", check_string);
@@ -282,12 +294,12 @@ int http_test(char *url)
 		if (p == NULL) {
 			if (debug)
 				printf("check string not found, return -1\n");
-			exit(5);
+			my_exit(5);
 		}
 	}
 	if (debug)
 		printf("All OK, return 0\n");
-	exit(0);
+	my_exit(0);
 }
 
 void usage(void)
@@ -307,16 +319,19 @@ void usage(void)
 	printf("  3  read tcp error\n");
 	printf("  4  not 200 response\n");
 	printf("  5  check_string not found\n");
+	printf("  8  help or cmdline errror\n");
 	printf("  9  https connect error\n");
 	printf(" 10  url error\n");
 	printf("print dns_time tcp_connect_time response_time transfer_time transfer_rate\n");
 	printf("             s                s             s             s        byte/s\n");
-	exit(11);
+	my_exit(8);
 }
 
 int main(int argc, char *argv[])
 {
 	int c;
+	strcpy(url, "NULL");
+
 	while ((c = getopt(argc, argv, "d4p6w:r:h")) != EOF)
 		switch (c) {
 		case 'd':
@@ -341,9 +356,11 @@ int main(int argc, char *argv[])
 			usage();
 		};
 
-	if (optind == argc - 1)
-		http_test(argv[optind]);
-	else
+	if (optind != argc - 1)
 		usage();
-	exit(11);
+
+	strncpy(url, argv[optind], MAXLEN);
+
+	http_test();
+	exit(8);
 }

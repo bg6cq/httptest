@@ -1,3 +1,6 @@
+/* httptest by james@ustc.edu.cn 2019.04.29 
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -65,7 +68,7 @@ int http_test(char *url)
 	int https = 0;
 	char hostname[MAXLEN];
 	char port[MAXLEN];
-	char *uri = NULL, *p;
+	char *uri, *p;
 	struct addrinfo hints, *res;
 	char buf[MAXCONTENTLEN];
 	SSL_CTX *ctx;
@@ -207,7 +210,6 @@ int http_test(char *url)
 	if (debug) {
 		printf("end tcp connect\n");
 		printf("begin http get request\n");
-		printf("socketfd: %d\n", sockfd);
 	}
 
 	int flag = 1;
@@ -222,7 +224,7 @@ int http_test(char *url)
 		}
 	}
 
-	snprintf(buf, MAXLEN, "GET %s HTTP/1.0\r\n" "Host: %s\r\n" "User-Agent: curl/7.29.0\r\n" "Connection: close\r\n\r\n", uri, hostname);
+	snprintf(buf, MAXLEN, "GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: httptest by james@ustc.edu.cn\r\nConnection: close\r\n\r\n", uri, hostname);
 	if (https)
 		n = SSL_write(ssl, buf, strlen(buf));
 	else
@@ -239,8 +241,9 @@ int http_test(char *url)
 			printf("get response: %d\n", n);
 		exit(3);
 	}
-/* HTTP/1.1 200 */
-	if (memcmp(buf + 9, "200", 3) != 0) {
+	buf[n] = 0;
+	/* HTTP/1.1 200 */
+	if ((memcmp(buf, "HTTP/1", 6) != 0) || (memcmp(buf + 9, "200", 3) != 0)) {
 		buf[12] = 0;
 		if (debug)
 			printf("get response: %s\n", buf);
@@ -249,9 +252,9 @@ int http_test(char *url)
 	content_len = n;
 	while (n < MAXCONTENTLEN) {
 		if (https)
-			n = SSL_read(ssl, buf + content_len, MAXCONTENTLEN - content_len);
+			n = SSL_read(ssl, buf + content_len, MAXCONTENTLEN - content_len - 1);
 		else
-			n = read(sockfd, buf + content_len, MAXCONTENTLEN - content_len);
+			n = read(sockfd, buf + content_len, MAXCONTENTLEN - content_len - 1);
 		if (n <= 0)
 			break;
 		content_len += n;
@@ -303,12 +306,6 @@ void usage(void)
 	printf("             s                s             s             s        byte/s\n");
 	exit(11);
 }
-
-// httptest  [ -d ] [ -4 ] [ -6 ] [ -w wait_time ] [ -r check_string ] url 
-// return 0 if got 200 response, and match the check_string
-//   else return -1
-// print dns_time tcp_connect_time response_time transfer_time transfer_rate
-//              s                s             s             s        byte/s
 
 int main(int argc, char *argv[])
 {

@@ -56,6 +56,7 @@ SSL_CTX *InitCTX(void)
 	ctx = SSL_CTX_new(method);	/* Create new context */
 	if (ctx == NULL) {
 		ERR_print_errors_fp(stdout);
+		close(sockfd);
 		exit(9);
 	}
 	return ctx;
@@ -220,6 +221,7 @@ int http_test(char *url)
 		if (SSL_connect(ssl) == -1) {
 			if (debug)
 				ERR_print_errors_fp(stdout);
+			close(sockfd);
 			exit(9);
 		}
 	}
@@ -239,6 +241,7 @@ int http_test(char *url)
 	if (n <= 0) {
 		if (debug)
 			printf("get response: %d\n", n);
+		close(sockfd);
 		exit(3);
 	}
 	buf[n] = 0;
@@ -247,6 +250,7 @@ int http_test(char *url)
 		buf[12] = 0;
 		if (debug)
 			printf("get response: %s\n", buf);
+		close(sockfd);
 		exit(4);
 	}
 	content_len = n;
@@ -261,6 +265,7 @@ int http_test(char *url)
 	}
 	buf[content_len] = 0;
 	end_time = delta_time();
+	close(sockfd);
 	if (debug) {
 		printf("read: %ld\n", content_len);
 	}

@@ -24,18 +24,27 @@ int sockfd = -1;
 int wait_time = 5;
 char check_string[MAXLEN];
 char url[MAXLEN];
+char ifluxdb_prefix[MAXLEN];
 
 struct timeval lasttv;
-float dns_time, connect_time, first_time, end_time;
+float dns_time, connect_time, response_time, transfer_time;
 unsigned long int content_len;
 
 void my_exit(int code)
 {
 	if (code == 0) {
-		printf("%d %.4f %.4f %.4f %.4f %ld %.0f %s\n", code, dns_time, connect_time, first_time, end_time, content_len, (float)content_len / end_time,
-		       url);
+		if (ifluxdb_prefix[0])
+			printf("%s code=10,dns_time=%.4f,connect_time=%.4f,response_time=%.4f,transfer_time=%.4f,content_len=%ld,transfer_rate=%.0f\n",
+			       ifluxdb_prefix, dns_time, connect_time, response_time, transfer_time, content_len, (float)content_len / transfer_time);
+		else
+			printf("%d %.4f %.4f %.4f %.4f %ld %.0f %s\n", code, dns_time, connect_time, response_time, transfer_time, content_len,
+			       (float)content_len / transfer_time, url);
 	} else {
-		printf("%d 0 0 0 0 0 %s\n", code, url);
+		if (ifluxdb_prefix[0])
+			printf("%s code=%d,dns_time=0,connect_time=0,response_time=0,transfer_time=0,content_len=0,transfer_rate=0\n", ifluxdb_prefix,
+			       10 - code);
+		else
+			printf("%d 0 0 0 0 0 %s\n", code, url);
 	}
 	exit(code);
 }
@@ -252,7 +261,7 @@ void http_test(void)
 		n = SSL_read(ssl, buf, 12);
 	else
 		n = read(sockfd, buf, 12);
-	first_time = delta_time();
+	response_time = delta_time();
 	if (n <= 0) {
 		if (debug)
 			printf("get response: %d\n", n);
@@ -279,7 +288,7 @@ void http_test(void)
 		content_len += n;
 	}
 	buf[content_len] = 0;
-	end_time = delta_time();
+	transfer_time = delta_time();
 	close(sockfd);
 	if (debug) {
 		printf("read: %ld\n", content_len);
@@ -305,14 +314,15 @@ void http_test(void)
 void usage(void)
 {
 	printf("httptest: http get test\n\n");
-	printf("  httptest  [ -d ] [ -4 ] [ -6 ] [ -p ] [ -w wait_time ] [ -r check_string ] url\n\n");
+	printf("httptest  [ -d ] [ -4 ] [ -6 ] [ -p ] [ -i prefix ] [ -w wait_time ] [ -r check_string ] url\n\n");
 	printf("    -d               print debug message\n");
 	printf("    -4               force ipv4\n");
 	printf("    -6               force ipv6\n");
 	printf("    -p               print response content\n");
+	printf("    -i prefix        influxdb output\n");
 	printf("    -w wait_time     max conntion time\n");
 	printf("    -r check_string  check_string\n\n");
-	printf("exit whith:\n");
+	printf("exit code:\n");
 	printf("  0  get 200 response and match the check_string in response\n");
 	printf("  1  dns error\n");
 	printf("  2  tcp connect error\n");
@@ -321,10 +331,11 @@ void usage(void)
 	printf("  5  check_string not found\n");
 	printf("  8  help or cmdline errror\n");
 	printf("  9  https connect error\n");
-	printf(" 10  url error\n");
-	printf("print dns_time tcp_connect_time response_time transfer_time transfer_rate\n");
-	printf("             s                s             s             s        byte/s\n");
-	my_exit(8);
+	printf(" 10  url error\n\n");
+	printf("output:\n");
+	printf("code dns_time tcp_connect_time response_time transfer_time transfer_rate url\n");
+	printf("            s                s             s             s        byte/s\n");
+	exit(8);
 }
 
 int main(int argc, char *argv[])
@@ -332,7 +343,7 @@ int main(int argc, char *argv[])
 	int c;
 	strcpy(url, "NULL");
 
-	while ((c = getopt(argc, argv, "d4p6w:r:h")) != EOF)
+	while ((c = getopt(argc, argv, "d4p6w:i:r:h")) != EOF)
 		switch (c) {
 		case 'd':
 			debug = 1;
@@ -348,6 +359,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'w':
 			wait_time = atoi(optarg);
+			break;
+		case 'i':
+			strncpy(ifluxdb_prefix, optarg, MAXLEN);
 			break;
 		case 'r':
 			strncpy(check_string, optarg, MAXLEN);

@@ -168,7 +168,8 @@ void http_test(void)
 
 	start_time();
 	if ((n = getaddrinfo(hostname, port, &hints, &res)) != 0) {
-		printf("getaddrinfo error for %s\n", hostname);
+		if (debug)
+			printf("getaddrinfo error for %s\n", hostname);
 		my_exit(1);
 	}
 	dns_time = delta_time();

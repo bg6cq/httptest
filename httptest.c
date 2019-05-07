@@ -230,11 +230,6 @@ void http_test(void)
 			printf("tcp connect error\n");
 		my_exit(2);
 	}
-	connect_time = delta_time();
-	if (debug) {
-		printf("end tcp connect\n");
-		printf("begin http get request\n");
-	}
 
 	int flag = 1;
 	setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int));
@@ -247,6 +242,12 @@ void http_test(void)
 			close(sockfd);
 			my_exit(9);
 		}
+	}
+
+	connect_time = delta_time();
+	if (debug) {
+		printf("end tcp & https connect\n");
+		printf("begin http get request\n");
 	}
 
 	snprintf(buf, MAXLEN,

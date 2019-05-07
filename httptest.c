@@ -211,6 +211,7 @@ void http_test(void)
 		timeout.tv_sec = wait_time;
 		timeout.tv_usec = 0;
 		setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+		setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
 		if (connect(sockfd, res->ai_addr, res->ai_addrlen) < 0) {
 			if (debug)

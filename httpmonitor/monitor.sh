@@ -18,14 +18,18 @@ log ()
         #sendsms $2 $1
 }
 
-grep -v ^# $URLFILE | while read url alfile user
+grep -v ^# $URLFILE | while read url alfile user checkstr
 do 
 
 ALFILE=${RUNDIR}/${alfile}.alarmon
 
 if [ $DEBUG ]; then echo checking $url; fi
 
+if [ $checkstr ]; then
+$HTTPTEST $url -r $checkstr  > /dev/null 2>/dev/null
+else
 $HTTPTEST $url  > /dev/null 2>/dev/null
+fi
 tmp=$?
 
 if [ $DEBUG ]; then echo result $tmp; fi

@@ -1,3 +1,3 @@
-#格式为要监测的URL 记数文件名 手机号码
-https://www.ustc.edu.cn www.ustc.edu.cn 1350569****
+#格式为要监测的URL 记数文件名 手机号码 关键字(可为空)
+https://www.ustc.edu.cn www.ustc.edu.cn 1350569**** 中国科学技术大学
 http://news.ustc.edu.cn news.ustc.edu.cn 1350569****

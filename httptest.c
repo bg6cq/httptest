@@ -91,7 +91,7 @@ void http_test(void)
 	int https = 0;
 	char hostname[MAXLEN];
 	char port[MAXLEN];
-	char *uri, *p;
+	char *uri, *p = NULL;
 	struct addrinfo hints, *res;
 	char buf[MAXCONTENTLEN];
 	SSL_CTX *ctx;

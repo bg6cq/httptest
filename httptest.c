@@ -237,6 +237,7 @@ void http_test(void)
 
 	if (https) {
 		SSL_set_fd(ssl, sockfd);
+		SSL_set_tlsext_host_name(ssl, hostname);
 		if (SSL_connect(ssl) == -1) {
 			if (debug)
 				ERR_print_errors_fp(stdout);
